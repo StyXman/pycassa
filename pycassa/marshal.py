@@ -7,6 +7,7 @@ import uuid
 import time
 import struct
 from datetime import datetime
+import binascii
 
 import pycassa.util as util
 
@@ -243,14 +244,23 @@ def packer_for(typestr):
             return value
         return noop
 
-    else: # data_type == 'BytesType' or something unknown
+    elif data_type == 'BytesType':
         def pack_bytes(v, _=None):
+            if not isinstance(v, str):
+                raise TypeError("A str value was expected, " +
+                                "but %s was received instead (%s)"
+                                % (v.__class__.__name__, str(v)))
+            return binascii.hexlify (v)
+        return pack_bytes
+
+    else: # data_type == 'BytesType' or something unknown
+        def pack_unknown(v, _=None):
             if not isinstance(v, basestring):
                 raise TypeError("A str or unicode value was expected, " +
                                 "but %s was received instead (%s)"
                                 % (v.__class__.__name__, str(v)))
             return v
-        return pack_bytes
+        return pack_unknown
 
 def unpacker_for(typestr):
     if typestr is None:
@@ -313,6 +323,9 @@ def unpacker_for(typestr):
 
     elif 'UUIDType' in data_type:
         return lambda v: uuid.UUID(bytes=v)
+
+    elif data_type=='ByteType':
+        return lambda v: binascii.unhexlify (v)
 
     else:
         return lambda v: v
